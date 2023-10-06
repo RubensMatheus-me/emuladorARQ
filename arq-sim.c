@@ -5,7 +5,13 @@
 
 #include "lib.h"
 
+typedef int bool;
+#define MEM_SIZE 1024
 
+#define SYSCALLEXIT 0
+#define SYSCALL 1
+#define SYSCALLINT 2
+#define SYSCALLNEWLINE 3
 
 const char* get_reg_name_str (uint16_t reg)
 {
@@ -23,29 +29,35 @@ const char* get_reg_name_str (uint16_t reg)
 	return str[reg];
 }
 
-typedef struct instruction {
+struct instruction {
 	uint8_t format;
 	uint8_t opcode;
 	uint8_t destiny;
 	uint8_t op1;
 	uint8_t op2;
 
-}Instruction;
+};
 
 uint16_t extract_bits (uint16_t v, uint8_t bstart, uint8_t blength);
-uint16_t memory[64]; //memoria
+uint16_t memory[MEM_SIZE]; //memoria
 int registers[8]; //8 registradores disponiveis
 
+uint16_t getMemory(int i) {
 
-int main (int argc, char **argv) {	
+	return memory[i];
+}
+	
+int main (int argc, char **argv) {
 	struct instruction instruction;
 	
-	memory[0] = 0b0000011101110001; //0 000000 101 110 001 add
+	memory[1] = 0b0000001111111010; // 0 000001 111 111 010 sub
+	for(int i=1; i< MEM_SIZE; i++) {
+		uint16_t aaa = getMemory(i);
+		printf("%u", aaa);
+	}
 	
 	uint8_t formatM0 = extract_bits(memory[0], 15, 1); //formato
 	uint8_t opcodeM0 = extract_bits(memory[0], 9, 6); //opcode
-	
-	memory[1] = 0b0000000101110001; // 0 000001 111 111 010 sub
 	
 	instruction.format = extract_bits(memory[0], 15, 1); //formato
 	instruction.opcode = extract_bits(memory[1], 9, 6); //opcode
@@ -63,6 +75,7 @@ int main (int argc, char **argv) {
 	printf("r2: %u\n", registers[instruction.op1]);
 	printf("r3: %u\n", registers[instruction.op2]);
 
+	
 	
 	switch (instruction.format) {
 		case 0:
@@ -86,10 +99,6 @@ int main (int argc, char **argv) {
 					registers[instruction.destiny] = registers[instruction.op1] / registers[instruction.op2];
 					printf("Valor do opcode: %u, divisao: %u\n", instruction.opcode, registers[instruction.destiny]);	
 					break;
-					 	
-				case 4:
-					
-					
 			}	
 	}	
 	
