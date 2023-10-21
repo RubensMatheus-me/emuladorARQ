@@ -29,33 +29,65 @@ const char* get_reg_name_str (uint16_t reg)
 	return str[reg];
 }
 
-struct instruction {
-	uint8_t format;
-	uint8_t opcode;
-	uint8_t destiny;
-	uint8_t op1;
-	uint8_t op2;
+typedef struct instructions {
+	uint16_t format;
+	uint16_t opcode;
+	uint16_t destiny;
+	uint16_t op1;
+	uint16_t op2;
+	uint16_t opI;
 
-};
+}Instructions;
 
 uint16_t extract_bits (uint16_t v, uint8_t bstart, uint8_t blength);
 uint16_t memory[MEM_SIZE]; //memoria
-int registers[8]; //8 registradores disponiveis
+uint16_t registers[8]; //8 registradores disponiveis
+uint16_t pc;
+uint16_t instruction;
+
 
 uint16_t getMemory(int i) {
-
 	return memory[i];
 }
+
+
+Instructions decode(uint16_t codedInstruction) {
+	Instructions decoded;
+	
+	switch (decoded.format) {
+		case 1: //formato I
+			decoded.opI = extract_bits(codedInstruction, 10, 2);	
+	}
+	decoded.format = extract_bits(codedInstruction, 15, 1); //formato
+	decoded.opcode = extract_bits(codedInstruction, 9, 6); //opcode
+	decoded.destiny = extract_bits(codedInstruction, 8, 3); //registrador 1
+	decoded.op1 = extract_bits(codedInstruction, 5, 3); //registrador 2
+	decoded.op2 = extract_bits(codedInstruction, 2, 3); //registrador 3
+	
+	registers[decoded.destiny] = decoded.destiny;
+	registers[decoded.op1] = decoded.op1;
+	registers[decoded.op2] = decoded.op2; 
+	
+	return decoded;
+
+}
+
+
 	
 int main (int argc, char **argv) {
-	struct instruction instruction;
 	
 	memory[1] = 0b0000001111111010; // 0 000001 111 111 010 sub
-	for(int i=1; i< MEM_SIZE; i++) {
-		uint16_t aaa = getMemory(i);
-		printf("%u", aaa);
-	}
 	
+	pc = getMemory(1);
+	instruction = pc;
+	
+	
+	decode(instruction);
+	
+	
+	
+	
+	/*
 	uint8_t formatM0 = extract_bits(memory[0], 15, 1); //formato
 	uint8_t opcodeM0 = extract_bits(memory[0], 9, 6); //opcode
 	
@@ -74,7 +106,7 @@ int main (int argc, char **argv) {
 	printf("r1: %u\n", registers[instruction.destiny]);
 	printf("r2: %u\n", registers[instruction.op1]);
 	printf("r3: %u\n", registers[instruction.op2]);
-
+	
 	
 	
 	switch (instruction.format) {
@@ -101,6 +133,7 @@ int main (int argc, char **argv) {
 					break;
 			}	
 	}	
+	*/
 	
 	
 	
@@ -108,6 +141,7 @@ int main (int argc, char **argv) {
 		printf("usage: %s [bin_name]\n", argv[0]);
 		exit(1);
 	}
+	
 
 	return 0;
 }
