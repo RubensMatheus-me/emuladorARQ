@@ -13,6 +13,8 @@ typedef int bool;
 #define SYSCALLINT 2
 #define SYSCALLNEWLINE 3
 
+int index =1;
+
 const char* get_reg_name_str (uint16_t reg)
 {
 	static const char *str[] = {
@@ -80,7 +82,9 @@ int main (int argc, char **argv) {
 	
 	pc = getMemory(1);
 	instruction = pc;
-	
+	while(1) {
+		
+	}
 	
 	decode(instruction);
 	
