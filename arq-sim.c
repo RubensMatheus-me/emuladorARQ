@@ -1,115 +1,186 @@
-#include <stdexcept>
-#include <string>
-#include <string_view>
+#include <stdlib.h>
+#include <stdint.h>
+#include <assert.h>
+#include <stdio.h>
 
-#include <cstdint>
-#include <cstdlib>
-
-#include "config.h"
 #include "lib.h"
-#include "arq-sim.h"
-#include "os.h"
+
+#define MEM_SIZE 1024
+
+#define SYSCALLEXIT 0
+#define SYSCALL 1
+#define SYSCALLNEWLINE 2
+#define SYSCALLINT 3
+
+const char* get_reg_name_str(uint16_t reg) {
+    static const char *str[] = {
+        "r0",
+        "r1",
+        "r2",
+        "r3",
+        "r4",
+        "r5",
+        "r6",
+        "r7"
+    };
+
+    return str[reg];
+}
+
+typedef struct instructions {
+    uint16_t format;
+    uint16_t opcode;
+    uint16_t destiny;
+    uint16_t op1;
+    uint16_t op2;
+    uint16_t imediate;
+} Instructions;
+
+uint16_t extract_bits(uint16_t v, uint8_t bstart, uint8_t blength);
+uint16_t memory[MEM_SIZE];
+uint16_t registers[8];
+uint16_t pc = 1;
+uint16_t instruction;
+
+uint16_t getMemory(int i) {
+    return memory[i];
+    pc++;
+}
+
+Instructions decode(uint16_t codedInstruction) {
+    Instructions decoded;
+    decoded.format = extract_bits(codedInstruction, 15, 1);
+
+    switch (decoded.format) {
+        case 0: // formato R
+            decoded.opcode = extract_bits(codedInstruction, 9, 6);
+            decoded.destiny = extract_bits(codedInstruction, 6, 3);
+            decoded.op1 = extract_bits(codedInstruction, 3, 3);
+            decoded.op2 = extract_bits(codedInstruction, 0, 3);
+            break;
+        case 1: // formato I
+            decoded.imediate = extract_bits(codedInstruction, 13, 2);
+            decoded.opcode = extract_bits(codedInstruction, 10, 3);
+            decoded.destiny = extract_bits(codedInstruction, 0, 10);
+            break;
+    }
+
+    return decoded;
+}
 
 
-namespace OS {
+void execute(Instructions instructions) {
+    switch (instructions.format) {
+        case 0: // formato R
+            switch (instructions.opcode) {
+                case 0: //add
+			registers[instructions.destiny] = registers[instructions.op1] + registers[instructions.op2];
+			break;
+                case 1: //sub
+			registers[instructions.destiny] = registers[instructions.op1] - registers[instructions.op2];
+			break;
+		case 2: //mult
+			registers[instructions.destiny] = registers[instructions.op1] * registers[instructions.op2];
+			break;
+		case 3: //div
+			registers[instructions.destiny] = registers[instructions.op1] / registers[instructions.op2];
+			break;
+                case 4: //cmp_equal
+            		registers[instructions.destiny] = registers[instructions.op1] == registers[instructions.op2];
+                	break;
+		case 5: //cmp_neq
+			registers[instructions.destiny] = registers[instructions.op1] != registers[instructions.op2];
+                	break;
+                case 6:
+                	registers[instructions.destiny] = registers[instructions.op1] < registers[instructions.op2];
+                	break;
+                case 7:
+                	registers[instructions.destiny] = registers[instructions.op1] > registers[instructions.op2];
+                	break;
+                case 8:
+                	registers[instructions.destiny] = registers[instructions.op1] <= registers[instructions.op2];
+                	break;
+                case 9:
+                	registers[instructions.destiny] = registers[instructions.op1] >= registers[instructions.op2];
+                	break;
+                case 10:
+                	registers[instructions.destiny] = registers[instructions.op1] & registers[instructions.op2];
+                	break;
+                case 11:
+              		registers[instructions.destiny] = registers[instructions.op1] | registers[instructions.op2];
+              		break;
+              	case 12:
+              		registers[instructions.destiny] = registers[instructions.op1] ^ registers[instructions.op2];
+              		break;
+              	case 13:
+              		registers[instructions.destiny] = registers[instructions.op1] >> registers[instructions.op2];
+              		break;
+              	case 14:
+              		registers[instructions.destiny] = registers[instructions.op1] << registers[instructions.op2];
+              		break;
+              	case 15:
+              		registers[instructions.destiny] = memory[registers[instructions.op1]];
+              	//memory[MEM_SIZE]
+              	case 16:
+              		memory[registers[instructions.op1]] = registers[instructions.op2];
+              		break;
+                case 63:
+                	switch (registers[0]) {
+        			case SYSCALLEXIT:
+            				exit(0);
+            				break;
+            			case SYSCALL:
+            			uint16_t start = registers[1];
+				while (memory[start] != '\0') { 
+					printf("%c", memory[start]);
+					start++;
+				}
+					break;	
 
-// ---------------------------------------
-Arch::Terminal *terminalSystem;
-Arch::Cpu *cpuSystem;
+				case SYSCALLNEWLINE:
+					printf("\n");
+					break;
 
-static std::string bufferedChar;
+				case SYSCALLINT:
+					printf("%u\n", registers[1]);
+					break;
+    			}	
+			break;
+            }
 
-void boot (Arch::Terminal *terminal, Arch::Cpu *cpu)
-{	
-	terminalSystem = terminal;
-	cpuSystem = cpu;
-	terminal->println(Arch::Terminal::Type::Command, "Type commands here");
-	terminal->println(Arch::Terminal::Type::App, "Apps output here");
-	terminal->println(Arch::Terminal::Type::Kernel, "Kernel output here");
-	
-	std::vector<uint16_t> loadBinary = Lib::load_from_disk_to_16bit_buffer("binario.bin");
-	
-	for(uint16_t i = 0; i < loadBinary.size(); i++) {
-		terminalSystem->println(Arch::Terminal::Type::App, i, "- ", loadBinary[i]);
-		cpuSystem->pmem_write(i ,loadBinary[i]);
+            break;
+        case 1: // formato I
+            switch (instructions.opcode) {
+                case 0: // jump
+                    pc = instructions.imediate;
+                    break;
+                case 1: // jump condicional
+                    if (registers[instructions.destiny]) {
+                        pc = instructions.imediate;
+                    }
+                    break;
+                case 3: // Mover valor imediato para o registrador destiny
+                    registers[instructions.destiny] = instructions.imediate;
+                    break;
+            }
+            break;
+    }
+}
+
+int main(int argc, char **argv) {
+	load_binary_to_memory (argv[1], memory, MEM_SIZE);
+
+	while (1) {
+    		uint16_t cInstruction =  getMemory(pc);
+    		Instructions decoded = decode(cInstruction);
+    		execute(decoded);
 	}
-	
- }
-// ---------------------------------------
 
-void interrupt(const Arch::InterruptCode interrupt) {
-    if (interrupt == Arch::InterruptCode::Keyboard) {
-        int typed_char = terminalSystem->read_typed_char();
-        char char_typed = static_cast<char>(typed_char);
 
-        if (terminalSystem->is_backspace(typed_char)) {
-            if (!bufferedChar.empty()) {
-            
-                bufferedChar.pop_back();
-                 for (size_t i = 0; i < bufferedChar.size() + 1	; ++i) {
-                 	terminalSystem->print(Arch::Terminal::Type::Command, '\r'); 
-                 	terminalSystem->print(Arch::Terminal::Type::Command, bufferedChar);
-                 }
-            }
-            terminalSystem->println(Arch::Terminal::Type::Kernel, "apagar");
-        }
-
-        else if (terminalSystem->is_alpha(typed_char) || terminalSystem->is_num(typed_char)) {
-            bufferedChar += char_typed;
-            terminalSystem->print(Arch::Terminal::Type::Command, char_typed);
-        }
-
-        else if (terminalSystem->is_return(typed_char)) {
-			terminalSystem->print(Arch::Terminal::Type::Command, '\n');
-      
-            terminalSystem->println(Arch::Terminal::Type::Kernel, "enter");
-            terminalSystem->print(Arch::Terminal::Type::App, bufferedChar);
-            terminalSystem->println(Arch::Terminal::Type::App, "");
-            
-            if (bufferedChar == "quit") {
-            	cpuSystem->Cpu::turn_off();
-            }
-            bufferedChar.clear(); 
-        }
-       
+    if (argc != 2) {
+        printf("usage: %s [bin_name]\n", argv[0]);
+        exit(1);
     }
+
+    return 0;
 }
-
-
-// ---------------------------------------
-
-void syscall () {
-    uint16_t r0 = cpuSystem->get_gpr(0);
-
-    switch (r0) {
-        case 0:
-            cpuSystem->Cpu::turn_off();
-            break;
-        case 1: {
-           uint16_t addr = cpuSystem->get_gpr(1);
-		   std::string str;
-		   char c;
-			//Memoria fisica
-	   while ((c = static_cast<char>(cpuSystem->pmem_read(addr++))) != '\0') {
-	        str += c;
-		}
-            terminalSystem->print(Arch::Terminal::Type::App, str);
-            break;
-        }
-        case 2:
-            terminalSystem->println(Arch::Terminal::Type::App, "");
-            break;
-        case 3: {
-            int number = cpuSystem->get_gpr(1);
-            terminalSystem->print(Arch::Terminal::Type::App, number);
-            break;
-        }
-        default:
-            terminalSystem->println(Arch::Terminal::Type::Kernel, "Unknown syscall");
-            break;
-    }
-}
-
-// ---------------------------------------
-
-} // end namespace OS
